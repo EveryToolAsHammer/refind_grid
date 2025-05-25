@@ -121,6 +121,7 @@ static REFIT_MENU_ENTRY MenuEntryFirmware = { L"Reboot to Computer Setup Utility
 static REFIT_MENU_ENTRY MenuEntryManageHidden = { L"Manage Hidden Tags Menu", TAG_HIDDEN, 1, 0, 0, NULL, NULL, NULL };
 static REFIT_MENU_ENTRY MenuEntryInstall = { L"Install rEFInd to Disk", TAG_INSTALL, 1, 0, 0, NULL, NULL, NULL };
 static REFIT_MENU_ENTRY MenuEntryBootorder = { L"Manage EFI boot order", TAG_BOOTORDER, 1, 0, 0, NULL, NULL, NULL };
+static REFIT_MENU_ENTRY MenuEntryIconOrder = { L"Customize icon order", TAG_ICON_ORDER, 1, 0, 0, NULL, NULL, NULL };
 static REFIT_MENU_ENTRY MenuEntryExit     = { L"Exit rEFInd", TAG_EXIT, 1, 0, 0, NULL, NULL, NULL };
 
 // Structure used to hold boot loader filenames and time stamps in
@@ -1672,6 +1673,10 @@ VOID ScanForTools(VOID) {
                 TempMenuEntry = CopyMenuEntry(&MenuEntryBootorder);
                 TempMenuEntry->Image = BuiltinIcon(BUILTIN_ICON_FUNC_BOOTORDER);
                 AddMenuEntry(&MainMenu, TempMenuEntry);
+                break;
+
+            case TAG_ICON_ORDER:
+                FindTool(AllToolLocations, ICON_ORDER_NAMES, L"Customize icon order", BUILTIN_ICON_FUNC_ICON_ORDER);
                 break;
 
         } // switch()

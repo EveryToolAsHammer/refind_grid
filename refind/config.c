@@ -541,6 +541,7 @@ VOID ReadConfig(CHAR16 *FileName)
         MergeStrings(&(GlobalConfig.DontScanFiles), FWUPDATE_NAMES, L',');
         MergeStrings(&(GlobalConfig.DontScanFiles), MEMTEST_NAMES, L',');
         MergeStrings(&(GlobalConfig.DontScanFiles), SHELL_NAMES, L',');
+        MergeStrings(&(GlobalConfig.DontScanFiles), ICON_ORDER_NAMES, L',');
         MyFreePool(GlobalConfig.DontScanVolumes);
         GlobalConfig.DontScanVolumes = StrDuplicate(DONT_SCAN_VOLUMES);
         GlobalConfig.WindowsRecoveryFiles = StrDuplicate(WINDOWS_RECOVERY_FILES);
@@ -689,6 +690,8 @@ VOID ReadConfig(CHAR16 *FileName)
                    GlobalConfig.ShowTools[i - 1] = TAG_INSTALL;
                 } else if (MyStriCmp(FlagName, L"bootorder")) {
                    GlobalConfig.ShowTools[i - 1] = TAG_BOOTORDER;
+                } else if (MyStriCmp(FlagName, L"icon_order")) {
+                   GlobalConfig.ShowTools[i - 1] = TAG_ICON_ORDER;
                 } else if (MyStriCmp(FlagName, L"apple_recovery")) {
                    GlobalConfig.ShowTools[i - 1] = TAG_APPLE_RECOVERY;
                 } else if (MyStriCmp(FlagName, L"windows_recovery")) {

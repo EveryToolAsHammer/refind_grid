@@ -79,7 +79,8 @@
 #define TAG_HIDDEN           (21)
 #define TAG_INSTALL          (22)
 #define TAG_BOOTORDER        (23)
-#define NUM_TOOLS            (24)
+#define TAG_ICON_ORDER       (24)
+#define NUM_TOOLS            (25)
 
 #define NUM_SCAN_OPTIONS 11
 
@@ -169,21 +170,25 @@
 #define MEMTEST_NAMES           L"memtest86.efi,memtest86_x64.efi,memtest86x64.efi,memtest86+x64.efi"
 #define MOK_NAMES               L"MokManager.efi,HashTool.efi,HashTool-signed.efi,KeyTool.efi,KeyTool-signed.efi,mmx64.efi"
 #define SHELL_NAMES             L"shell.efi,shellx64.efi"
+#define ICON_ORDER_NAMES        L"customize_icon_order.efi"
 #elif defined(EFI32)
 #define FWUPDATE_NAMES          L"fwupia32.efi"
 #define MEMTEST_NAMES           L"memtest86.efi,memtest86_ia32.efi,memtest86ia32.efi,memtest86+ia32.efi"
 #define MOK_NAMES               L"MokManager.efi,HashTool.efi,HashTool-signed.efi,KeyTool.efi,KeyTool-signed.efi,mmia32.efi"
 #define SHELL_NAMES             L"shell.efi,shellia32.efi"
+#define ICON_ORDER_NAMES        L"customize_icon_order.efi"
 #elif defined(EFIAARCH64)
 #define FWUPDATE_NAMES          L"fwupaa64.efi"
 #define MEMTEST_NAMES           L"memtest86.efi,memtest86_aa64.efi,memtest86aa64.efi"
 #define MOK_NAMES               L"MokManager.efi,HashTool.efi,HashTool-signed.efi,KeyTool.efi,KeyTool-signed.efi,mmaa64.efi"
 #define SHELL_NAMES             L"shell.efi,shellaa64.efi"
+#define ICON_ORDER_NAMES        L"customize_icon_order.efi"
 #else
 #define FWUPDATE_NAMES          L"fwup.efi"
 #define MEMTEST_NAMES           L"memtest86.efi"
 #define MOK_NAMES               L"MokManager.efi,HashTool.efi,HashTool-signed.efi,KeyTool.efi,KeyTool-signed.efi"
 #define SHELL_NAMES             L"shell.efi"
+#define ICON_ORDER_NAMES        L"customize_icon_order.efi"
 #endif
 
 // Directories to search for tools....

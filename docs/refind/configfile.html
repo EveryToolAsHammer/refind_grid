@@ -337,7 +337,7 @@ timeout 20
 </tr>
 <tr>
    <td><tt>showtools</tt></td>
-   <td><tt>shell</tt>, <tt>memtest</tt>, <tt>gdisk</tt>, <tt>gptsync</tt>, <tt>install</tt>, <tt>bootorder</tt>, <tt>apple_recovery</tt>, <tt>csr_rotate</tt>, <tt>mok_tool</tt>, <tt>fwupdate</tt>, <tt>netboot</tt>, <tt>about</tt>, <tt>hidden_tags</tt>, <tt>exit</tt>, <tt>shutdown</tt>, <tt>reboot</tt>, and <tt>firmware</tt></td>
+   <td><tt>shell</tt>, <tt>memtest</tt>, <tt>gdisk</tt>, <tt>gptsync</tt>, <tt>install</tt>, <tt>bootorder</tt>, <tt>icon_order</tt>, <tt>apple_recovery</tt>, <tt>csr_rotate</tt>, <tt>mok_tool</tt>, <tt>fwupdate</tt>, <tt>netboot</tt>, <tt>about</tt>, <tt>hidden_tags</tt>, <tt>exit</tt>, <tt>shutdown</tt>, <tt>reboot</tt>, and <tt>firmware</tt></td>
    <td><p>Specifies which tool tags to display on the second row:</p>
    <ul>
    <li class="tight"><tt>shell</tt> launches an EFI shell, if one is found on the disk or available as a built-in EFI feature</li>
@@ -346,6 +346,7 @@ timeout 20
    <li class="tight"><tt>gptsync</tt> launches a tool that creates a hybrid MBR</li>
    <li class="tight"><tt>install</tt> installs rEFInd from the booted medium to another ESP</li>
    <li class="tight"><tt>bootorder</tt> provides a tool for manipulating the EFI boot order (<i>not</i> the order of items in rEFInd's own menu)</li>
+   <li class="tight"><tt>icon_order</tt> launches a tool to rearrange the icons shown by rEFInd</li>
    <li class="tight"><tt>apple_recovery</tt> boots the macOS Recovery HD</li>
    <li class="tight"><tt>csr_rotate</tt> rotates through System Integrity Protection (SIP) values specified by <tt>csr_values</tt></li>
    <li class="tight"><tt>windows_recovery</tt> boots a Windows recovery tool</li>

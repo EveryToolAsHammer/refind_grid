@@ -260,6 +260,7 @@ use_nvram false
 #  install          - an option to install rEFInd from the current location
 #                     to another ESP
 #  bootorder        - adjust the EFI's (NOT rEFInd's) boot order
+#  icon_order       - customize the order of rEFInd icons
 #  about            - an "about this program" option
 #  hidden_tags      - manage hidden tags
 #  exit             - a tag to exit from rEFInd
@@ -275,7 +276,7 @@ use_nvram false
 # To completely disable scanning for all tools, provide a showtools line
 # with no options.
 #
-#showtools shell, bootorder, gdisk, memtest, mok_tool, apple_recovery, windows_recovery, about, hidden_tags, reboot, exit, firmware, fwupdate
+#showtools shell, bootorder, icon_order, gdisk, memtest, mok_tool, apple_recovery, windows_recovery, about, hidden_tags, reboot, exit, firmware, fwupdate
 
 # Additional directories to scan for tools. You may specify a directory
 # alone or a volume identifier plus pathname. The default is to scan no
