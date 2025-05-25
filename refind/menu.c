@@ -107,6 +107,14 @@ BOOLEAN PointerEnabled = FALSE;
 BOOLEAN PointerActive = FALSE;
 BOOLEAN DrawSelection = TRUE;
 
+// Variables used for grid layout
+static UINTN *gItemPosX = NULL;
+static UINTN *gItemPosY = NULL;
+static INTN  *gRow0IndexMap = NULL;
+static UINTN *gRow0EntryIndices = NULL;
+static UINTN  gRow0Count = 0;
+static UINTN  gRow1Count = 0;
+
 extern EFI_GUID         RefindGuid;
 extern REFIT_MENU_ENTRY MenuEntryReturn;
 static REFIT_MENU_ENTRY MenuEntryYes = { L"Yes", TAG_RETURN, 1, 0, 0, NULL, NULL, NULL };
@@ -200,50 +208,62 @@ static VOID UpdateScroll(IN OUT SCROLL_STATE *State, IN UINTN Movement)
 
     switch (Movement) {
         case SCROLL_LINE_LEFT:
-            if (State->CurrentSelection > 0) {
-                State->CurrentSelection --;
+            if (State->CurrentSelection <= State->FinalRow0) {
+                INTN idx = gRow0IndexMap[State->CurrentSelection];
+                if (idx > 0)
+                    State->CurrentSelection = gRow0EntryIndices[idx - 1];
+            } else if (State->CurrentSelection > State->InitialRow1) {
+                State->CurrentSelection--;
             }
             break;
 
         case SCROLL_LINE_RIGHT:
-            if (State->CurrentSelection < State->MaxIndex) {
-                State->CurrentSelection ++;
+            if (State->CurrentSelection <= State->FinalRow0) {
+                INTN idx = gRow0IndexMap[State->CurrentSelection];
+                if ((UINTN)(idx + 1) < gRow0Count)
+                    State->CurrentSelection = gRow0EntryIndices[idx + 1];
+            } else if (State->CurrentSelection < State->MaxIndex) {
+                State->CurrentSelection++;
             }
             break;
 
         case SCROLL_LINE_UP:
             if (State->ScrollMode == SCROLL_MODE_ICONS) {
                if (State->CurrentSelection >= State->InitialRow1) {
-                  if (State->MaxIndex > State->InitialRow1) { // avoid division by 0!
-                     State->CurrentSelection = State->FirstVisible + (State->LastVisible - State->FirstVisible) *
-                                               (State->CurrentSelection - State->InitialRow1) /
-                                               (State->MaxIndex - State->InitialRow1);
-                  } else {
-                     State->CurrentSelection = State->FirstVisible;
-                  } // if/else
-               } // if in second row
+                   UINTN col = State->CurrentSelection - State->InitialRow1;
+                   if (col >= State->Cols) col = State->Cols - 1;
+                   if (col >= gRow0Count) col = gRow0Count - 1;
+                   State->CurrentSelection = gRow0EntryIndices[col];
+               } else {
+                   INTN idx = gRow0IndexMap[State->CurrentSelection];
+                   if (idx >= (INTN)State->Cols)
+                       State->CurrentSelection = gRow0EntryIndices[idx - State->Cols];
+               }
             } else {
                if (State->CurrentSelection > 0)
                   State->CurrentSelection--;
-            } // if/else
+            }
             break;
 
         case SCROLL_LINE_DOWN:
            if (State->ScrollMode == SCROLL_MODE_ICONS) {
                if (State->CurrentSelection <= State->FinalRow0) {
-                  if (State->LastVisible > State->FirstVisible) { // avoid division by 0!
-                     State->CurrentSelection = State->InitialRow1 + (State->MaxIndex - State->InitialRow1) *
-                                               (State->CurrentSelection - State->FirstVisible) /
-                                               (State->LastVisible - State->FirstVisible);
-                  } else {
-                     State->CurrentSelection = State->InitialRow1;
-                  } // if/else
-               } // if in first row
-            } else {
+                   INTN idx = gRow0IndexMap[State->CurrentSelection];
+                   if ((UINTN)(idx + State->Cols) < gRow0Count) {
+                       State->CurrentSelection = gRow0EntryIndices[idx + State->Cols];
+                   } else if (gRow1Count > 0) {
+                       UINTN col = idx % State->Cols;
+                       if (col >= gRow1Count) col = gRow1Count - 1;
+                       State->CurrentSelection = State->InitialRow1 + col;
+                   }
+               } else if (State->CurrentSelection < State->MaxIndex) {
+                   State->CurrentSelection++;
+               }
+           } else {
                if (State->CurrentSelection < State->MaxIndex)
                   State->CurrentSelection++;
-            } // if/else
-            break;
+           }
+           break;
 
         case SCROLL_PAGE_UP:
            if (State->CurrentSelection <= State->FinalRow0)
@@ -360,8 +380,8 @@ static VOID IdentifyRows(IN SCROLL_STATE *State, IN REFIT_MENU_SCREEN *Screen) {
             State->InitialRow1 = i;
         } // if/else
     } // for
-    if ((State->ScrollMode == SCROLL_MODE_ICONS) && (State->MaxVisible > (State->FinalRow0 + 1)))
-        State->MaxVisible = State->FinalRow0 + 1;
+    if (State->ScrollMode == SCROLL_MODE_ICONS)
+        State->MaxVisible = State->MaxIndex + 1;
 } // static VOID IdentifyRows()
 
 // Blank the screen, wait for a keypress or pointer event, and restore banner/background.
@@ -1099,17 +1119,10 @@ static VOID PaintAll(IN REFIT_MENU_SCREEN *Screen, IN SCROLL_STATE *State, UINTN
 
     if (Screen->Entries[State->CurrentSelection]->Row == 0)
         AdjustScrollState(State);
-    for (i = State->FirstVisible; i <= State->MaxIndex; i++) {
-        if (Screen->Entries[i]->Row == 0) {
-            if (i <= State->LastVisible) {
-                DrawMainMenuEntry(Screen->Entries[i], (i == State->CurrentSelection) ? TRUE : FALSE,
-                                  itemPosX[i - State->FirstVisible], row0PosY);
-            } // if
-        } else {
-            DrawMainMenuEntry(Screen->Entries[i],
-                              (i == State->CurrentSelection) ? TRUE : FALSE,
-                              itemPosX[i], row1PosY);
-        }
+    for (i = 0; i <= State->MaxIndex; i++) {
+        DrawMainMenuEntry(Screen->Entries[i],
+                          (i == State->CurrentSelection) ? TRUE : FALSE,
+                          itemPosX[i], gItemPosY[i]);
     }
     if (!(GlobalConfig.HideUIFlags & HIDEUI_FLAG_LABEL) && (!PointerActive || (PointerActive && DrawSelection))) {
         DrawTextWithTransparency(L"", 0, textPosY);
@@ -1136,24 +1149,14 @@ static VOID PaintSelection(IN REFIT_MENU_SCREEN *Screen, IN SCROLL_STATE *State,
     if (((State->CurrentSelection <= State->LastVisible) &&
         (State->CurrentSelection >= State->FirstVisible)) ||
         (State->CurrentSelection >= State->InitialRow1) ) {
-        if (Screen->Entries[State->PreviousSelection]->Row == 0) {
-            XSelectPrev = State->PreviousSelection - State->FirstVisible;
-            YPosPrev = row0PosY;
-        } else {
-            XSelectPrev = State->PreviousSelection;
-            YPosPrev = row1PosY;
-        } // if/else
-        if (Screen->Entries[State->CurrentSelection]->Row == 0) {
-            XSelectCur = State->CurrentSelection - State->FirstVisible;
-            YPosCur = row0PosY;
-        } else {
-            XSelectCur = State->CurrentSelection;
-            YPosCur = row1PosY;
-        } // if/else
+        XSelectPrev = gItemPosX[State->PreviousSelection];
+        YPosPrev = gItemPosY[State->PreviousSelection];
+        XSelectCur = gItemPosX[State->CurrentSelection];
+        YPosCur = gItemPosY[State->CurrentSelection];
         DrawMainMenuEntry(Screen->Entries[State->PreviousSelection], FALSE,
-                          itemPosX[XSelectPrev], YPosPrev);
+                          XSelectPrev, YPosPrev);
         DrawMainMenuEntry(Screen->Entries[State->CurrentSelection], TRUE,
-                          itemPosX[XSelectCur], YPosCur);
+                          XSelectCur, YPosCur);
         if (!(GlobalConfig.HideUIFlags & HIDEUI_FLAG_LABEL) && (!PointerActive || (PointerActive && DrawSelection))) {
             DrawTextWithTransparency(L"", 0, textPosY);
             DrawTextWithTransparency(Screen->Entries[State->CurrentSelection]->Title,
@@ -1219,9 +1222,8 @@ VOID MainMenuStyle(IN REFIT_MENU_SCREEN *Screen, IN SCROLL_STATE *State,
                    IN UINTN Function, IN CHAR16 *ParamText)
 {
     INTN i;
-    static UINTN row0PosX, row0PosXRunning, row1PosY, row0Loaders;
-    UINTN row0Count, row1Count, row1PosX, row1PosXRunning;
-    static UINTN *itemPosX;
+    static UINTN row0PosX, row1PosY;
+    UINTN row1PosX, row1PosXRunning;
     static UINTN row0PosY, textPosY;
 
     State->ScrollMode = SCROLL_MODE_ICONS;
@@ -1230,56 +1232,81 @@ VOID MainMenuStyle(IN REFIT_MENU_SCREEN *Screen, IN SCROLL_STATE *State,
         case MENU_FUNCTION_INIT:
             InitScroll(State, Screen->EntryCount, GlobalConfig.MaxTags);
 
-            // layout
-            row0Count = 0;
-            row1Count = 0;
-            row0Loaders = 0;
+            // count entries
+            gRow0Count = 0;
+            gRow1Count = 0;
             for (i = 0; i <= State->MaxIndex; i++) {
-               if (Screen->Entries[i]->Row == 1) {
-                  row1Count++;
-               } else {
-                  row0Loaders++;
-                  if (row0Count < State->MaxVisible)
-                     row0Count++;
-               }
+               if (Screen->Entries[i]->Row == 0)
+                  gRow0Count++;
+               else
+                  gRow1Count++;
             }
-            row0PosX = (UGAWidth + TILE_XSPACING - (TileSizes[0] + TILE_XSPACING) * row0Count) >> 1;
-            row0PosY = ComputeRow0PosY();
-            row1PosX = (UGAWidth + TILE_XSPACING - (TileSizes[1] + TILE_XSPACING) * row1Count) >> 1;
-            row1PosY = row0PosY + TileSizes[0] + TILE_YSPACING;
-            if (row1Count > 0)
+
+            State->Cols = (UGAWidth / (TileSizes[0] + TILE_XSPACING));
+            if (State->Cols == 0) State->Cols = 1;
+            State->Rows = (gRow0Count + State->Cols - 1) / State->Cols;
+
+            gItemPosX = AllocatePool(sizeof(UINTN) * Screen->EntryCount);
+            gItemPosY = AllocatePool(sizeof(UINTN) * Screen->EntryCount);
+            gRow0IndexMap = AllocatePool(sizeof(INTN) * Screen->EntryCount);
+            gRow0EntryIndices = AllocatePool(sizeof(UINTN) * gRow0Count);
+
+            row1PosX = (UGAWidth + TILE_XSPACING - (TileSizes[1] + TILE_XSPACING) * gRow1Count) >> 1;
+            row0PosX = (UGAWidth + TILE_XSPACING - (TileSizes[0] + TILE_XSPACING) * State->Cols) >> 1;
+
+            {
+                UINTN totalHeight = State->Rows * TileSizes[0] + (State->Rows - 1) * TILE_YSPACING;
+                if (gRow1Count > 0)
+                    totalHeight += TILE_YSPACING + TileSizes[1];
+                row0PosY = (UGAHeight - totalHeight) / 2;
+            }
+            row1PosY = row0PosY + State->Rows * (TileSizes[0] + TILE_YSPACING);
+            if (gRow1Count > 0)
                 textPosY = row1PosY + TileSizes[1] + TILE_YSPACING;
             else
                 textPosY = row1PosY;
 
-            itemPosX = AllocatePool(sizeof(UINTN) * Screen->EntryCount);
-            row0PosXRunning = row0PosX;
+            UINTN r0Index = 0, r1Index = 0;
             row1PosXRunning = row1PosX;
             for (i = 0; i <= State->MaxIndex; i++) {
                 if (Screen->Entries[i]->Row == 0) {
-                    itemPosX[i] = row0PosXRunning;
-                    row0PosXRunning += TileSizes[0] + TILE_XSPACING;
+                    gRow0EntryIndices[r0Index] = i;
+                    gRow0IndexMap[i] = r0Index;
+                    UINTN row = r0Index / State->Cols;
+                    UINTN col = r0Index % State->Cols;
+                    gItemPosX[i] = row0PosX + col * (TileSizes[0] + TILE_XSPACING);
+                    gItemPosY[i] = row0PosY + row * (TileSizes[0] + TILE_YSPACING);
+                    r0Index++;
                 } else {
-                    itemPosX[i] = row1PosXRunning;
+                    gRow0IndexMap[i] = -1;
+                    gItemPosX[i] = row1PosXRunning;
+                    gItemPosY[i] = row1PosY;
                     row1PosXRunning += TileSizes[1] + TILE_XSPACING;
+                    r1Index++;
                 }
             }
-            // initial painting
+
             InitSelection();
             SwitchToGraphicsAndClear();
             break;
 
         case MENU_FUNCTION_CLEANUP:
-            MyFreePool(itemPosX);
+            MyFreePool(gItemPosX);
+            MyFreePool(gItemPosY);
+            MyFreePool(gRow0IndexMap);
+            MyFreePool(gRow0EntryIndices);
+            gItemPosX = gItemPosY = NULL;
+            gRow0IndexMap = NULL;
+            gRow0EntryIndices = NULL;
             break;
 
         case MENU_FUNCTION_PAINT_ALL:
-            PaintAll(Screen, State, itemPosX, row0PosY, row1PosY, textPosY);
-            PaintArrows(State, row0PosX - TILE_XSPACING, row0PosY + (TileSizes[0] / 2), row0Loaders);
+            PaintAll(Screen, State, gItemPosX, row0PosY, row1PosY, textPosY);
+            PaintArrows(State, row0PosX - TILE_XSPACING, row0PosY + (TileSizes[0] / 2), gRow0Count);
             break;
 
         case MENU_FUNCTION_PAINT_SELECTION:
-            PaintSelection(Screen, State, itemPosX, row0PosY, row1PosY, textPosY);
+            PaintSelection(Screen, State, gItemPosX, row0PosY, row1PosY, textPosY);
             break;
 
         case MENU_FUNCTION_PAINT_TIMEOUT:
@@ -1296,77 +1323,15 @@ VOID MainMenuStyle(IN REFIT_MENU_SCREEN *Screen, IN SCROLL_STATE *State,
 UINTN FindMainMenuItem(IN REFIT_MENU_SCREEN *Screen, IN SCROLL_STATE *State, IN UINTN PosX, IN UINTN PosY)
 {
     UINTN i;
-    static UINTN row0PosX, row0PosXRunning, row1PosY, row0Loaders;
-    UINTN row0Count, row1Count, row1PosX, row1PosXRunning;
-    static UINTN *itemPosX;
-    static UINTN row0PosY;
-    UINTN itemRow;
 
-    row0Count = 0;
-    row1Count = 0;
-    row0Loaders = 0;
     for (i = 0; i <= State->MaxIndex; i++) {
-        if (Screen->Entries[i]->Row == 1) {
-                row1Count++;
-        } else {
-                row0Loaders++;
-                if (row0Count < State->MaxVisible)
-                        row0Count++;
+        UINTN size = TileSizes[Screen->Entries[i]->Row];
+        if (PosX >= gItemPosX[i] && PosX <= gItemPosX[i] + size &&
+            PosY >= gItemPosY[i] && PosY <= gItemPosY[i] + size) {
+            return i;
         }
     }
-    row0PosX = (UGAWidth + TILE_XSPACING - (TileSizes[0] + TILE_XSPACING) * row0Count) >> 1;
-    row0PosY = ComputeRow0PosY();
-    row1PosX = (UGAWidth + TILE_XSPACING - (TileSizes[1] + TILE_XSPACING) * row1Count) >> 1;
-    row1PosY = row0PosY + TileSizes[0] + TILE_YSPACING;
-
-    if (PosY >= row0PosY && PosY <= row0PosY + TileSizes[0]) {
-        itemRow = 0;
-        if(PosX <= row0PosX) {
-            return POINTER_LEFT_ARROW;
-        }
-        else if(PosX >= (UGAWidth - row0PosX)) {
-            return POINTER_RIGHT_ARROW;
-        }
-    } else if (PosY >= row1PosY && PosY <= row1PosY + TileSizes[1]) {
-        itemRow = 1;
-    } else { // Y coordinate is outside of either row
-        return POINTER_NO_ITEM;
-    }
-
-    UINTN ItemIndex = POINTER_NO_ITEM;
-
-    itemPosX = AllocatePool(sizeof(UINTN) * Screen->EntryCount);
-    row0PosXRunning = row0PosX;
-    row1PosXRunning = row1PosX;
-    for (i = 0; i <= State->MaxIndex; i++) {
-        if (Screen->Entries[i]->Row == 0) {
-            itemPosX[i] = row0PosXRunning;
-            row0PosXRunning += TileSizes[0] + TILE_XSPACING;
-        } else {
-            itemPosX[i] = row1PosXRunning;
-            row1PosXRunning += TileSizes[1] + TILE_XSPACING;
-        }
-    }
-
-    for (i = State->FirstVisible; i <= State->MaxIndex; i++) {
-        if (Screen->Entries[i]->Row == 0 && itemRow == 0) {
-            if (i <= State->LastVisible) {
-                if(PosX >= itemPosX[i - State->FirstVisible] && PosX <= itemPosX[i - State->FirstVisible] + TileSizes[0]) {
-                    ItemIndex = i;
-                    break;
-                }
-        } // if
-        } else if (Screen->Entries[i]->Row == 1 && itemRow == 1) {
-            if(PosX >= itemPosX[i] && PosX <= itemPosX[i] + TileSizes[1]) {
-                ItemIndex = i;
-                break;
-            }
-        }
-    }
-
-    MyFreePool(itemPosX);
-
-    return ItemIndex;
+    return POINTER_NO_ITEM;
 } // VOID FindMainMenuItem()
 
 VOID GenerateWaitList() {

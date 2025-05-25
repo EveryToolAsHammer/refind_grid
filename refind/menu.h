@@ -76,6 +76,7 @@ typedef struct {
    INTN CurrentSelection, PreviousSelection, MaxIndex;
    INTN FirstVisible, LastVisible, MaxVisible;
    INTN FinalRow0, InitialRow1;
+   UINTN Rows, Cols; // grid dimensions for row-0 icons
    INTN ScrollMode;
    BOOLEAN PaintAll, PaintSelection;
 } SCROLL_STATE;
