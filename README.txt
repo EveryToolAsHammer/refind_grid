@@ -18,6 +18,7 @@ following files and subdirectories:
    refind-sb-healthcheck            Script to help manage Secure Boot keys
    mkrlconf                         A script to create refind_linux.conf
    mvrefind                         A script to move a rEFInd installation
+   customize_icon_order.py          Script to reorder icons
    README.txt                       This file
    NEWS.txt                         A summary of program changes
    LICENSE.txt                      The original rEFIt license
