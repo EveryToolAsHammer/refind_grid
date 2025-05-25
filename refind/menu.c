@@ -388,12 +388,57 @@ static VOID IdentifyRows(IN SCROLL_STATE *State, IN REFIT_MENU_SCREEN *Screen) {
 // Screen may still require redrawing of text and icons on return.
 // TODO: Support more sophisticated screen savers, such as power-saving
 // mode and dynamic images.
+// Simple pseudo-random number generator for the Matrix screen saver
+static UINT32 MatrixSeed = 123456789;
+static UINT32 MatrixRand(VOID) {
+    MatrixSeed = MatrixSeed * 1103515245 + 12345;
+    return MatrixSeed;
+}
+
+// Display a basic "Matrix"-style falling code screen saver. Runs until the user
+// provides input via keyboard or pointer device.
+static VOID MatrixScreensaver(VOID) {
+    UINTN *Pos;
+    UINTN i, Columns = ConWidth, Rows = ConHeight;
+
+    Pos = AllocatePool(sizeof(UINTN) * Columns);
+    if (Pos == NULL)
+        return;
+
+    for (i = 0; i < Columns; i++)
+        Pos[i] = MatrixRand() % Rows;
+
+    refit_call1_wrapper(ST->ConOut->ClearScreen, ST->ConOut);
+
+    for (;;) {
+        UINTN Input = WaitForInput(50); // 50 ms timer
+        if (Input == INPUT_KEY || Input == INPUT_POINTER || Input == INPUT_TIMER_ERROR)
+            break;
+
+        for (i = 0; i < Columns; i++) {
+            CHAR16 ch[2];
+            ch[0] = (MatrixRand() & 1) ? L'1' : L'0';
+            ch[1] = 0;
+            refit_call3_wrapper(ST->ConOut->SetCursorPosition, ST->ConOut, i, Pos[i]);
+            refit_call2_wrapper(ST->ConOut->OutputString, ST->ConOut, ch);
+            Pos[i] = (Pos[i] + 1) % Rows;
+        }
+    }
+
+    MyFreePool(Pos);
+}
+
 static VOID SaveScreen(VOID) {
     EG_PIXEL Black = { 0x0, 0x0, 0x0, 0 };
-   
+
     egClearScreen(&Black);
 
-    WaitForInput(0);
+    if (AllowGraphicsMode) {
+        SwitchToText(FALSE);
+        MatrixScreensaver();
+    } else {
+        WaitForInput(0);
+    }
 
     if (AllowGraphicsMode)
         SwitchToGraphicsAndClear();
