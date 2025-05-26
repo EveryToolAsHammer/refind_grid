@@ -106,6 +106,8 @@ UINTN WaitListLength = 0;
 BOOLEAN PointerEnabled = FALSE;
 BOOLEAN PointerActive = FALSE;
 BOOLEAN DrawSelection = TRUE;
+// When TRUE, arrow keys move the highlighted icon rather than the cursor
+static BOOLEAN MoveModifier = FALSE;
 
 // Variables used for grid layout
 static UINTN *gItemPosX = NULL;
@@ -315,6 +317,56 @@ static VOID UpdateScroll(IN OUT SCROLL_STATE *State, IN UINTN Movement)
         State->PaintSelection = TRUE;
     State->LastVisible = State->FirstVisible + State->MaxVisible - 1;
 } // static VOID UpdateScroll()
+
+// Swap two entries in the screen's entry list
+static VOID SwapEntries(IN REFIT_MENU_SCREEN *Screen, UINTN A, UINTN B) {
+    REFIT_MENU_ENTRY *Temp = Screen->Entries[A];
+    Screen->Entries[A] = Screen->Entries[B];
+    Screen->Entries[B] = Temp;
+}
+
+// Move the currently selected entry in the specified direction within row 0
+static VOID MoveCurrentEntry(IN REFIT_MENU_SCREEN *Screen, IN OUT SCROLL_STATE *State,
+                             IN MENU_STYLE_FUNC StyleFunc, IN UINTN Direction) {
+    if (Screen->Entries[State->CurrentSelection]->Row != 0)
+        return;
+
+    INTN r0Index = gRow0IndexMap[State->CurrentSelection];
+    UINTN TargetIndex = State->CurrentSelection;
+
+    switch (Direction) {
+        case SCROLL_LINE_LEFT:
+            if (r0Index > 0)
+                TargetIndex = gRow0EntryIndices[r0Index - 1];
+            break;
+        case SCROLL_LINE_RIGHT:
+            if ((UINTN)(r0Index + 1) < gRow0Count)
+                TargetIndex = gRow0EntryIndices[r0Index + 1];
+            break;
+        case SCROLL_LINE_UP:
+            if (r0Index >= (INTN)State->Cols)
+                TargetIndex = gRow0EntryIndices[r0Index - State->Cols];
+            break;
+        case SCROLL_LINE_DOWN:
+            if ((UINTN)(r0Index + State->Cols) < gRow0Count)
+                TargetIndex = gRow0EntryIndices[r0Index + State->Cols];
+            break;
+        default:
+            return;
+    }
+
+    if (TargetIndex == State->CurrentSelection)
+        return;
+
+    SwapEntries(Screen, State->CurrentSelection, TargetIndex);
+    State->CurrentSelection = TargetIndex;
+
+    // Recompute layout after the move
+    StyleFunc(Screen, State, MENU_FUNCTION_CLEANUP, NULL);
+    StyleFunc(Screen, State, MENU_FUNCTION_INIT, NULL);
+    IdentifyRows(State, Screen);
+    State->PaintAll = TRUE;
+}
 
 //
 // menu helper functions
@@ -562,16 +614,36 @@ UINTN RunGenericMenu(IN REFIT_MENU_SCREEN *Screen,
             LOG(3, LOG_LINE_NORMAL, L"Processing keystroke (ScanCode = %d)....", key.ScanCode);
             switch (key.ScanCode) {
                 case SCAN_UP:
-                    UpdateScroll(&State, SCROLL_LINE_UP);
+                    if (MoveModifier) {
+                        MoveCurrentEntry(Screen, &State, StyleFunc, SCROLL_LINE_UP);
+                        MoveModifier = FALSE;
+                    } else {
+                        UpdateScroll(&State, SCROLL_LINE_UP);
+                    }
                     break;
                 case SCAN_LEFT:
-                    UpdateScroll(&State, SCROLL_LINE_LEFT);
+                    if (MoveModifier) {
+                        MoveCurrentEntry(Screen, &State, StyleFunc, SCROLL_LINE_LEFT);
+                        MoveModifier = FALSE;
+                    } else {
+                        UpdateScroll(&State, SCROLL_LINE_LEFT);
+                    }
                     break;
                 case SCAN_DOWN:
-                    UpdateScroll(&State, SCROLL_LINE_DOWN);
+                    if (MoveModifier) {
+                        MoveCurrentEntry(Screen, &State, StyleFunc, SCROLL_LINE_DOWN);
+                        MoveModifier = FALSE;
+                    } else {
+                        UpdateScroll(&State, SCROLL_LINE_DOWN);
+                    }
                     break;
                 case SCAN_RIGHT:
-                    UpdateScroll(&State, SCROLL_LINE_RIGHT);
+                    if (MoveModifier) {
+                        MoveCurrentEntry(Screen, &State, StyleFunc, SCROLL_LINE_RIGHT);
+                        MoveModifier = FALSE;
+                    } else {
+                        UpdateScroll(&State, SCROLL_LINE_RIGHT);
+                    }
                     break;
                 case SCAN_HOME:
                     UpdateScroll(&State, SCROLL_FIRST);
@@ -602,6 +674,9 @@ UINTN RunGenericMenu(IN REFIT_MENU_SCREEN *Screen,
                     if (EjectMedia())
                         MenuExit = MENU_EXIT_ESCAPE;
                     break;
+                default:
+                    MoveModifier = FALSE;
+                    break;
             }
             LOG(3, LOG_LINE_NORMAL, L"Processing keystroke (UnicodeChar = %d)....", key.UnicodeChar);
             switch (key.UnicodeChar) {
@@ -620,10 +695,15 @@ UINTN RunGenericMenu(IN REFIT_MENU_SCREEN *Screen,
                 case '-':
                     MenuExit = MENU_EXIT_HIDE;
                     break;
+                case 'R':
+                case 'r':
+                    MoveModifier = TRUE;
+                    break;
                 case '\\':
                     egScreenShot();
                     break;
                 default:
+                    MoveModifier = FALSE;
                     KeyAsString[0] = key.UnicodeChar;
                     KeyAsString[1] = 0;
                     ShortcutEntry = FindMenuShortcutEntry(Screen, KeyAsString);
