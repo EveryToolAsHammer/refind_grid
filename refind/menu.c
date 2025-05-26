@@ -107,6 +107,12 @@ BOOLEAN PointerEnabled = FALSE;
 BOOLEAN PointerActive = FALSE;
 BOOLEAN DrawSelection = TRUE;
 
+// Key used to trigger icon move mode (F11)
+#ifndef SCAN_F11
+#define SCAN_F11 0x0015
+#endif
+static BOOLEAN MoveMode = FALSE;
+
 // Variables used for grid layout
 static UINTN *gItemPosX = NULL;
 static UINTN *gItemPosY = NULL;
@@ -324,6 +330,39 @@ VOID AddMenuInfoLine(IN REFIT_MENU_SCREEN *Screen, IN CHAR16 *InfoLine)
 {
     LOG(3, LOG_LINE_NORMAL, L"Adding menu info line: '%s'", InfoLine);
     AddListElement((VOID ***) &(Screen->InfoLines), &(Screen->InfoLineCount), InfoLine);
+}
+
+// Swap two menu entries
+static VOID SwapMenuEntries(REFIT_MENU_SCREEN *Screen, UINTN A, UINTN B) {
+    REFIT_MENU_ENTRY *Tmp = Screen->Entries[A];
+    Screen->Entries[A] = Screen->Entries[B];
+    Screen->Entries[B] = Tmp;
+}
+
+// Recompute grid layout after modifying entry order
+static VOID RecomputeLayout(MENU_STYLE_FUNC StyleFunc, REFIT_MENU_SCREEN *Screen, SCROLL_STATE *State) {
+    StyleFunc(Screen, State, MENU_FUNCTION_CLEANUP, NULL);
+    StyleFunc(Screen, State, MENU_FUNCTION_INIT, NULL);
+    IdentifyRows(State, Screen);
+    State->PaintAll = TRUE;
+}
+
+static VOID MoveSelectionLeft(MENU_STYLE_FUNC StyleFunc, REFIT_MENU_SCREEN *Screen, SCROLL_STATE *State) {
+    UINTN Cur = State->CurrentSelection;
+    if (Cur > 0 && Screen->Entries[Cur]->Row == Screen->Entries[Cur - 1]->Row) {
+        SwapMenuEntries(Screen, Cur - 1, Cur);
+        State->CurrentSelection--;
+        RecomputeLayout(StyleFunc, Screen, State);
+    }
+}
+
+static VOID MoveSelectionRight(MENU_STYLE_FUNC StyleFunc, REFIT_MENU_SCREEN *Screen, SCROLL_STATE *State) {
+    UINTN Cur = State->CurrentSelection;
+    if (Cur < State->MaxIndex && Screen->Entries[Cur]->Row == Screen->Entries[Cur + 1]->Row) {
+        SwapMenuEntries(Screen, Cur, Cur + 1);
+        State->CurrentSelection++;
+        RecomputeLayout(StyleFunc, Screen, State);
+    }
 }
 
 VOID AddMenuEntry(IN REFIT_MENU_SCREEN *Screen, IN REFIT_MENU_ENTRY *Entry)
@@ -562,16 +601,32 @@ UINTN RunGenericMenu(IN REFIT_MENU_SCREEN *Screen,
             LOG(3, LOG_LINE_NORMAL, L"Processing keystroke (ScanCode = %d)....", key.ScanCode);
             switch (key.ScanCode) {
                 case SCAN_UP:
-                    UpdateScroll(&State, SCROLL_LINE_UP);
+                    if (MoveMode)
+                        MoveMode = FALSE; // no vertical move implemented
+                    else
+                        UpdateScroll(&State, SCROLL_LINE_UP);
                     break;
                 case SCAN_LEFT:
-                    UpdateScroll(&State, SCROLL_LINE_LEFT);
+                    if (MoveMode) {
+                        MoveSelectionLeft(StyleFunc, Screen, &State);
+                        MoveMode = FALSE;
+                    } else {
+                        UpdateScroll(&State, SCROLL_LINE_LEFT);
+                    }
                     break;
                 case SCAN_DOWN:
-                    UpdateScroll(&State, SCROLL_LINE_DOWN);
+                    if (MoveMode)
+                        MoveMode = FALSE; // no vertical move implemented
+                    else
+                        UpdateScroll(&State, SCROLL_LINE_DOWN);
                     break;
                 case SCAN_RIGHT:
-                    UpdateScroll(&State, SCROLL_LINE_RIGHT);
+                    if (MoveMode) {
+                        MoveSelectionRight(StyleFunc, Screen, &State);
+                        MoveMode = FALSE;
+                    } else {
+                        UpdateScroll(&State, SCROLL_LINE_RIGHT);
+                    }
                     break;
                 case SCAN_HOME:
                     UpdateScroll(&State, SCROLL_FIRST);
@@ -594,6 +649,9 @@ UINTN RunGenericMenu(IN REFIT_MENU_SCREEN *Screen,
                     break;
                 case SCAN_DELETE:
                     MenuExit = MENU_EXIT_HIDE;
+                    break;
+                case SCAN_F11:
+                    MoveMode = TRUE;
                     break;
                 case SCAN_F10:
                     egScreenShot();
