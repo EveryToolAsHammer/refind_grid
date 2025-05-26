@@ -1,3 +1,23 @@
+🚀 What is refind_grid and What Makes It Better?
+The refind_grid repository is a community-built fork/enhancement of rEFInd that builds on its solid foundation and introduces a grid-based layout and interactive customization to enhance usability.
+
+🆕 Key Improvements in refind_grid:
+🔲 Grid Menu Layout:
+
+Instead of rEFInd’s traditional single horizontal row of OS icons, refind_grid presents the icons in a grid format.
+
+This improves clarity and access when many operating systems or boot options are available.
+
+It maximizes screen real estate, allowing for faster visual scanning and selection.
+
+📦 Interactive Reordering with 'R' Key:
+
+Holding down the R key while selecting a boot option allows users to reposition icons using arrow keys (↑ ↓ ← →).
+
+Once rearranged, the grid menu order is persistently saved and remains consistent across reboots.
+
+This empowers users to prioritize and organize their boot options without editing config files manually — a huge quality-of-life improvement.
+
 Brief Installation Instructions (Binary Package)
 ================================================
 
