@@ -109,6 +109,10 @@ BOOLEAN DrawSelection = TRUE;
 // When TRUE, arrow keys move the highlighted icon rather than the cursor
 static BOOLEAN MoveModifier = FALSE;
 
+static CHAR16* ReadIconOrder(VOID);
+static VOID SaveIconOrder(IN REFIT_MENU_SCREEN *Screen);
+VOID ApplyIconOrder(IN REFIT_MENU_SCREEN *Screen);
+
 // Variables used for grid layout
 static UINTN *gItemPosX = NULL;
 static UINTN *gItemPosY = NULL;
@@ -119,6 +123,7 @@ static UINTN  gRow1Count = 0;
 
 extern EFI_GUID         RefindGuid;
 extern REFIT_MENU_ENTRY MenuEntryReturn;
+extern CHAR16           *gIconOrder;
 static REFIT_MENU_ENTRY MenuEntryYes = { L"Yes", TAG_RETURN, 1, 0, 0, NULL, NULL, NULL };
 static REFIT_MENU_ENTRY MenuEntryNo = { L"No", TAG_RETURN, 1, 0, 0, NULL, NULL, NULL };
 
@@ -377,6 +382,7 @@ static VOID MoveCurrentEntry(IN REFIT_MENU_SCREEN *Screen, IN OUT SCROLL_STATE *
     StyleFunc(Screen, State, MENU_FUNCTION_INIT, NULL);
     IdentifyRows(State, Screen);
     State->PaintAll = TRUE;
+    SaveIconOrder(Screen);
 }
 
 //
@@ -1926,3 +1932,76 @@ UINTN RunMainMenu(REFIT_MENU_SCREEN *Screen, CHAR16** DefaultSelection, REFIT_ME
     } // if
     return MenuExit;
 } /* UINTN RunMainMenu() */
+
+static CHAR16* ReadIconOrder(VOID) {
+    CHAR8       *Buffer = NULL;
+    UINTN       Size;
+    EFI_STATUS  Status;
+
+    Status = EfivarGetRaw(&RefindGuid, L"IconOrder", &Buffer, &Size);
+    if ((Status != EFI_SUCCESS) && (Status != EFI_NOT_FOUND))
+        CheckError(Status, L"in ReadIconOrder()");
+    if ((Status == EFI_SUCCESS) && (Size == 0)) {
+        MyFreePool(Buffer);
+        Buffer = NULL;
+    }
+    return (CHAR16 *) Buffer;
+} // static CHAR16* ReadIconOrder()
+
+static VOID SaveIconOrder(IN REFIT_MENU_SCREEN *Screen) {
+    EFI_STATUS Status;
+    CHAR16    *Order = NULL;
+    UINTN      i;
+
+    for (i = 0; i < Screen->EntryCount; i++) {
+        if (Screen->Entries[i]->Row == 0)
+            MergeStrings(&Order, Screen->Entries[i]->Title, L',');
+    }
+
+    i = Order ? StrLen(Order) : 0;
+    Status = EfivarSetRaw(&RefindGuid, L"IconOrder", (CHAR8 *) Order,
+                          i * 2 + 2 * (i > 0), TRUE);
+    CheckError(Status, L"in SaveIconOrder()");
+    if (gIconOrder) {
+        MyFreePool(gIconOrder);
+        gIconOrder = NULL;
+    }
+    if (Order)
+        gIconOrder = StrDuplicate(Order);
+    MyFreePool(Order);
+} // static VOID SaveIconOrder()
+
+VOID ApplyIconOrder(IN REFIT_MENU_SCREEN *Screen) {
+    CHAR16 *Order = NULL, *Element = NULL;
+    UINTN   i, j, pos = 0, NewIndex = 0;
+
+    if (gIconOrder == NULL)
+        gIconOrder = ReadIconOrder();
+    Order = gIconOrder;
+    if (Order == NULL)
+        return;
+
+    REFIT_MENU_ENTRY **NewEntries = AllocatePool(sizeof(REFIT_MENU_ENTRY*) * Screen->EntryCount);
+    BOOLEAN *Used = AllocateZeroPool(sizeof(BOOLEAN) * Screen->EntryCount);
+
+    while ((Element = FindCommaDelimited(Order, pos++)) != NULL) {
+        for (i = 0; i < Screen->EntryCount; i++) {
+            if (!Used[i] && Screen->Entries[i]->Row == 0 &&
+                MyStriCmp(Screen->Entries[i]->Title, Element)) {
+                NewEntries[NewIndex++] = Screen->Entries[i];
+                Used[i] = TRUE;
+                break;
+            }
+        }
+        MyFreePool(Element);
+    }
+    for (i = 0; i < Screen->EntryCount; i++) {
+        if (!Used[i])
+            NewEntries[NewIndex++] = Screen->Entries[i];
+    }
+    for (j = 0; j < Screen->EntryCount; j++)
+        Screen->Entries[j] = NewEntries[j];
+
+    MyFreePool(NewEntries);
+    MyFreePool(Used);
+} // VOID ApplyIconOrder()

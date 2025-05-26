@@ -157,6 +157,7 @@ REFIT_CONFIG GlobalConfig = { /* TextOnly = */ FALSE,
                             };
 
 CHAR16 *gHiddenTools = NULL;
+CHAR16 *gIconOrder = NULL;
 
 EFI_GUID RefindGuid = REFIND_GUID_VALUE;
 
@@ -250,6 +251,7 @@ VOID RescanAll(BOOLEAN DisplayMessage, BOOLEAN Reconnect) {
     SetVolumeIcons();
     ScanForBootloaders(DisplayMessage);
     ScanForTools();
+    ApplyIconOrder(&MainMenu);
 } // VOID RescanAll()
 
 #ifdef __MAKEWITH_TIANO
@@ -525,6 +527,7 @@ efi_main (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     SetVolumeIcons();
     ScanForBootloaders(FALSE);
     ScanForTools();
+    ApplyIconOrder(&MainMenu);
 
     // SetupScreen() clears the screen; but ScanForBootloaders() may display a
     // message that must be deleted, so do so
