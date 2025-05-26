@@ -125,6 +125,14 @@ static REFIT_MENU_ENTRY MenuEntryNo = { L"No", TAG_RETURN, 1, 0, 0, NULL, NULL, 
 // Forward declaration used by MoveCurrentEntry()
 static VOID IdentifyRows(IN SCROLL_STATE *State, IN REFIT_MENU_SCREEN *Screen);
 
+// Return the smallest integer whose square is greater than or equal to Value
+static UINTN CeilSqrt(IN UINTN Value) {
+    UINTN Result = 0;
+    while (Result * Result < Value)
+        Result++;
+    return Result;
+} // UINTN CeilSqrt()
+
 //
 // Graphics helper functions
 //
@@ -1325,8 +1333,15 @@ VOID MainMenuStyle(IN REFIT_MENU_SCREEN *Screen, IN SCROLL_STATE *State,
                   gRow1Count++;
             }
 
-            State->Cols = (UGAWidth / (TileSizes[0] + TILE_XSPACING));
-            if (State->Cols == 0) State->Cols = 1;
+            UINTN maxCols = UGAWidth / (TileSizes[0] + TILE_XSPACING);
+            if (maxCols == 0)
+                maxCols = 1;
+            UINTN idealCols = CeilSqrt(gRow0Count);
+            if (idealCols == 0)
+                idealCols = 1;
+            if (idealCols > maxCols)
+                idealCols = maxCols;
+            State->Cols = idealCols;
             State->Rows = (gRow0Count + State->Cols - 1) / State->Cols;
 
             gItemPosX = AllocatePool(sizeof(UINTN) * Screen->EntryCount);
