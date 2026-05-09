@@ -1886,8 +1886,9 @@ UINTN RunMainMenu(REFIT_MENU_SCREEN *Screen, CHAR16** DefaultSelection, REFIT_ME
         Style = GraphicsMenuStyle;
         MainStyle = MainMenuStyle;
         
-        PointerEnabled = PointerActive = pdAvailable();
-        DrawSelection = !PointerEnabled;
+        PointerEnabled = pdAvailable();
+        PointerActive = FALSE;
+        DrawSelection = TRUE;
     }
 
     // Generate this now and keep it around forever, since it's likely to be
